@@ -1,6 +1,6 @@
 # omnibus/amazon
 
-Amazon Shipping for [glitchr/omnibus](https://github.com/glitchr-studio/omnibus): rates,
+Amazon Shipping for [omniscient/omnibus](https://github.com/glitchr-studio/omnibus): rates,
 purchased shipments with their labels, tracking and cancellation - the Selling Partner API's
 Shipping v2, with Login with Amazon.
 
@@ -8,7 +8,7 @@ Shipping v2, with Login with Amazon.
 $gateway = (new AmazonGatewayFactory($http))->create($options);   // $http: the application's HTTP client - none given, the factory makes its own; the options below
 ```
 
-No framework needed: the package requires `glitchr/omnibus` and `symfony/http-client`. In a
+No framework needed: the package requires `omniscient/omnibus` and `symfony/http-client`. In a
 Symfony application, the same through the bundle's configuration:
 
 ```yaml
