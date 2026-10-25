@@ -81,6 +81,9 @@ decimals (at least 0.01), its `value` as insured value and as the value of its o
 a reference). The ship date is `Shipment::$shippingDate` (else now), written `Y-m-d\TH:i:s` followed
 by `Z` without converting it to UTC. The channel is `EXTERNAL`.
 
+> [!WARNING]
+> Known defect: the ship date is suffixed `Z` without being converted to UTC, where Amazon reads it as UTC: outside UTC the date sent is off by the offset.
+
 **Rate.** getRates for the shipment: every rate Amazon offers. The service is its `serviceId`
 (else its `rateId`), the label its `serviceName`, the amount its `totalCharge` in that charge's
 currency (`EUR` when none), `days` the whole days from the ship date to the end of the promised
@@ -97,11 +100,17 @@ The `shipmentId` is not kept in the `Label` when a tracking id comes back. A pur
 either is a `CarrierException` (`Amazon Shipping purchased no shipment.`). `pickupPoint` is not
 sent.
 
+> [!WARNING]
+> Known defect: `cancel()` needs the `shipmentId`, which the `Label` does not keep when a tracking id comes back, where `cancel($label->trackingNumber)` should cancel what `ship()` booked.
+
 **Track.** `GET /tracking` with the number and the carrier id `AMZN_UK`, whatever the region or
 the business; the locale is not sent. Each event of `eventHistory`: its `eventTime`, its
 `eventCode` as both description and `code` (Amazon's event has no text here), `city countryCode`
 as location; sorted oldest first. The status is the summary's `status`, else the latest event's
 code:
+
+> [!WARNING]
+> Known defect: the carrier id is always `AMZN_UK`, whatever the region, where it should follow the configured region.
 
 | Amazon code | `TrackingStatus` |
 |---|---|
