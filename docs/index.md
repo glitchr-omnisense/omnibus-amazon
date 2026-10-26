@@ -1,6 +1,6 @@
 # omnibus/amazon
 
-Amazon Shipping for [omniscient/omnibus](https://github.com/glitchr-studio/omnibus): rates,
+Amazon Shipping for [omnisense/omnibus](https://github.com/glitchr-omnisense/omnibus): rates,
 purchased shipments with their labels, tracking and cancellation, through the Selling Partner API's
 Shipping v2 on a Login with Amazon (LWA) access token. The gateway calls:
 
@@ -22,7 +22,7 @@ call has a 20-second timeout.
 composer require omnibus/amazon
 ```
 
-Requires PHP 8.2, `omniscient/omnibus` (2.x) and `symfony/http-client` (6.4, 7 or 8); given no
+Requires PHP 8.2, `omnisense/omnibus` (2.x) and `symfony/http-client` (6.4, 7 or 8); given no
 HTTP client, the factory makes one with `HttpClient::create()`. In a Symfony application with
 `Omnibus\Bridge\Symfony\OmnibusBundle`, the factory is registered as soon as the package is
 installed.
@@ -45,7 +45,7 @@ installed.
 | `region` | string | `eu` | no | `eu`, `na` or `fe`; another value is `eu` |
 | `business_id` | ?string | `null` | no | the shipping business; not sent when unset |
 | `sandbox` | bool | `false` | no | `true`: the region's SP-API sandbox |
-| `rates` | list | - | no | prices from configuration instead of getRates ([the rates option](https://github.com/glitchr-studio/omnibus/blob/2.x/docs/configuration.md#the-rates-option)): with it, getRates is not called for rating |
+| `rates` | list | - | no | prices from configuration instead of getRates ([the rates option](https://github.com/glitchr-omnisense/omnibus/blob/2.x/docs/configuration.md#the-rates-option)): with it, getRates is not called for rating |
 
 Shipment options (`Shipment::$options`):
 
