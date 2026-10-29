@@ -45,6 +45,12 @@ final class Mapping
         ]);
     }
 
+    /** The ship date in UTC, as its "Z" says (Shipment::$shippingDate in any time zone, else now). */
+    public static function shipDate(Shipment $s): string
+    {
+        return ($s->shippingDate ?? new \DateTimeImmutable())->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z');
+    }
+
     public static function package(Parcel $p, Shipment $s, int $i): array
     {
         return [

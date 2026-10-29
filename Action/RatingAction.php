@@ -36,7 +36,7 @@ final class RatingAction implements ActionInterface, ApiAwareInterface
             'shipTo' => Mapping::address($s->recipient),
             'packages' => array_map(static fn ($p, $i) => Mapping::package($p, $s, $i), $s->parcels, array_keys($s->parcels)),
             'channelDetails' => ['channelType' => 'EXTERNAL'],
-            'shipDate' => ($s->shippingDate ?? new \DateTimeImmutable())->format('Y-m-d\TH:i:s\Z'),
+            'shipDate' => Mapping::shipDate($s),
         ]);
         $rates = [];
         foreach ($data['rates'] ?? [] as $rate) {

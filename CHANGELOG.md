@@ -13,3 +13,5 @@
 - `cancel()` reaches the shipment `ship()` bought: Amazon cancels by its `shipmentId`, which the
   label did not keep (it carries the package's tracking id). The label's `carrierReference` keeps
   it, and `cancel()` takes that reference; a bare value is still taken as the shipment id.
+- The ship date is sent in UTC: it was written with a `Z` without being converted, so a ship date
+  outside UTC was off by its offset (10:00 in Paris went as 10:00Z, two hours late in summer).

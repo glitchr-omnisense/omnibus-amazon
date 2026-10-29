@@ -43,7 +43,7 @@ final class ShippingAction implements ActionInterface, ApiAwareInterface
             'shipTo' => Mapping::address($s->recipient),
             'packages' => array_map(static fn ($p, $i) => Mapping::package($p, $s, $i), $s->parcels, array_keys($s->parcels)),
             'channelDetails' => ['channelType' => 'EXTERNAL'],
-            'shipDate' => ($s->shippingDate ?? new \DateTimeImmutable())->format('Y-m-d\TH:i:s\Z'),
+            'shipDate' => Mapping::shipDate($s),
         ]);
         $rates = $quote['rates'] ?? [];
         usort($rates, static fn ($a, $b) => ((float) ($a['totalCharge']['value'] ?? 0)) <=> ((float) ($b['totalCharge']['value'] ?? 0)));

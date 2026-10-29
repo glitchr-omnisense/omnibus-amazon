@@ -117,4 +117,16 @@ final class AmazonGatewayTest extends TestCase
         parse_str((string) parse_url(end($this->calls)[1], \PHP_URL_QUERY), $query);
         self::assertSame('AMZN_FR', $query['carrierId']);
     }
+
+    /** Shipping API v2's shipDate is ISO 8601 in UTC ("Z"): a ship date in Paris at 10:00 (+02:00) is 08:00Z. */
+    public function testTheShipDateIsSentInUtc(): void
+    {
+        $s = self::shipment();
+        $paris = new Shipment($s->sender, $s->recipient, $s->parcels, reference: 'ORDER-1042', shippingDate: new \DateTimeImmutable('2026-10-06 10:00', new \DateTimeZone('Europe/Paris')));
+        $this->gateway()->rate($paris);
+        self::assertSame('2026-10-06T08:00:00Z', $this->calls[1][2]['shipDate']);
+        $this->calls = [];
+        $this->gateway()->ship($paris);
+        self::assertSame('2026-10-06T08:00:00Z', $this->calls[1][2]['shipDate']);
+    }
 }

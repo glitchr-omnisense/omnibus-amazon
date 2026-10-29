@@ -79,11 +79,8 @@ characters), city, postcode, country, email and phone; no state is sent. Each pa
 its dimensions in centimetres (a missing one counts as 10), its weight in kilograms with three
 decimals (at least 0.01), its `value` as insured value and as the value of its one item (with the
 `description` and the same weight), and a client reference `<reference>-<n>` (`omnibus-<n>` without
-a reference). The ship date is `Shipment::$shippingDate` (else now), written `Y-m-d\TH:i:s` followed
-by `Z` without converting it to UTC. The channel is `EXTERNAL`.
-
-> [!WARNING]
-> Known defect: the ship date is suffixed `Z` without being converted to UTC, where Amazon reads it as UTC: outside UTC the date sent is off by the offset.
+a reference). The ship date is `Shipment::$shippingDate` (else now), converted to UTC and written
+`Y-m-d\TH:i:s\Z` (10:00 in Paris in summer is `08:00:00Z`). The channel is `EXTERNAL`.
 
 **Rate.** getRates for the shipment: every rate Amazon offers. The service is its `serviceId`
 (else its `rateId`), the label its `serviceName`, the amount its `totalCharge` in that charge's
@@ -217,7 +214,7 @@ those recorded answers.
 
 Not verified: the README says the package is built from Amazon's published SP-API documentation
 and was not yet run against the sandbox; that needs the credentials above. Unchecked against
-Amazon: the ship date carries a `Z` without being converted to UTC; tracking and cancelling through
+Amazon: tracking and cancelling through
 the label's `carrierReference` follow the Shipping API v2 model (getTracking's `carrierId` "returned
 by the getRates operation for the selected rate", cancelShipment's `shipmentId` "returned by the
 purchaseShipment operation"), not yet a real purchase.
