@@ -3,6 +3,7 @@
 namespace Omnibus\Amazon;
 
 use Omnibus\Exception\CarrierException;
+use Omnibus\Http\Redaction;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface as HttpExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -53,14 +54,16 @@ final class Api
             $status = $response->getStatusCode();
             $data = json_decode($response->getContent(false), true);
         } catch (HttpExceptionInterface|\JsonException $e) {
-            throw new CarrierException('amazon', 'Amazon Shipping request failed: '.$e->getMessage(), null, $e);
+            $secrets = $this->secrets();
+
+            throw Redaction::withoutArguments(new CarrierException('amazon', 'Amazon Shipping request failed: '.Redaction::text($e->getMessage(), $secrets), null, Redaction::copy($e, $secrets)));
         }
         if (!\is_array($data)) {
-            throw new CarrierException('amazon', sprintf('Amazon Shipping answered HTTP %d with a body that is not JSON.', $status));
+            throw Redaction::withoutArguments(new CarrierException('amazon', sprintf('Amazon Shipping answered HTTP %d with a body that is not JSON.', $status)));
         }
         if ($status >= 400 || !empty($data['errors'])) {
             $error = $data['errors'][0] ?? [];
-            throw new CarrierException('amazon', (string) ($error['message'] ?? sprintf('HTTP %d', $status)), isset($error['code']) ? (string) $error['code'] : null);
+            throw Redaction::withoutArguments(new CarrierException('amazon', (string) ($error['message'] ?? sprintf('HTTP %d', $status)), isset($error['code']) ? (string) $error['code'] : null));
         }
 
         return $data['payload'] ?? $data;
@@ -74,14 +77,26 @@ final class Api
         try {
             $data = $this->http->request('POST', self::LWA, ['body' => ['grant_type' => 'refresh_token', 'refresh_token' => $this->refreshToken, 'client_id' => $this->clientId, 'client_secret' => $this->clientSecret], 'timeout' => $this->timeout])->toArray(false);
         } catch (HttpExceptionInterface $e) {
-            throw new CarrierException('amazon', 'Login with Amazon gave no token: '.$e->getMessage(), null, $e);
+            $secrets = $this->secrets();
+
+            throw Redaction::withoutArguments(new CarrierException('amazon', 'Login with Amazon gave no token: '.Redaction::text($e->getMessage(), $secrets), null, Redaction::copy($e, $secrets)));
         }
         if (empty($data['access_token'])) {
-            throw new CarrierException('amazon', (string) ($data['error_description'] ?? 'Login with Amazon gave no token: check the client id, secret and refresh token.'));
+            throw Redaction::withoutArguments(new CarrierException('amazon', (string) ($data['error_description'] ?? 'Login with Amazon gave no token: check the client id, secret and refresh token.')));
         }
         $this->token = (string) $data['access_token'];
         $this->expiresAt = time() + (int) ($data['expires_in'] ?? 3600);
 
         return $this->token;
+    }
+
+    /**
+     * What a failure must not carry: the credentials and the token, and what a request made of them.
+     *
+     * @return list<string>
+     */
+    private function secrets(string ...$more): array
+    {
+        return [$this->clientSecret, $this->refreshToken, (string) $this->token, ...$more];
     }
 }
