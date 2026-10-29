@@ -9,7 +9,7 @@ Shipping v2 on a Login with Amazon (LWA) access token. The gateway calls:
 | token | `POST https://api.amazon.com/auth/o2/token` |
 | rate | `POST /shipping/v2/shipments/rates` |
 | ship | `POST /shipping/v2/shipments/rates`, then `POST /shipping/v2/shipments` |
-| track | `GET /shipping/v2/tracking?trackingId={number}&carrierId=AMZN_UK` |
+| track | `GET /shipping/v2/tracking?trackingId={number}&carrierId={carrier}` |
 | cancel | `PUT /shipping/v2/shipments/{shipmentId}/cancel` |
 
 on the region's endpoint: `https://sellingpartnerapi-eu.amazon.com`, `-na` or `-fe` (`region`),
@@ -44,6 +44,7 @@ installed.
 | `refresh_token` | string | - | yes | the authorised account's refresh token |
 | `region` | string | `eu` | no | `eu`, `na` or `fe`; another value is `eu` |
 | `business_id` | ?string | `null` | no | the shipping business; not sent when unset |
+| `carrier_id` | string | `AMZN_UK` | no | the carrier a bare tracking number is tracked with; a label's `carrierReference` names the carrier of the rate bought |
 | `sandbox` | bool | `false` | no | `true`: the region's SP-API sandbox |
 | `rates` | list | - | no | prices from configuration instead of getRates ([the rates option](https://github.com/glitchr-omnisense/omnibus/blob/2.x/docs/configuration.md#the-rates-option)): with it, getRates is not called for rating |
 
@@ -96,21 +97,20 @@ shipment.`, or `... offers no rate ...`). It is purchased with the quote's `requ
 inch label at 300 dpi, `PDF` or `ZPL`. The tracking number is the first package's `trackingId`,
 else the `shipmentId`; the label the first package document's `contents`, base64-decoded,
 `application/pdf` or `application/zpl`. `trackingUrl` is `https://track.amazon.com/tracking/<number>`.
-The `shipmentId` is not kept in the `Label` when a tracking id comes back. A purchase without
-either is a `CarrierException` (`Amazon Shipping purchased no shipment.`). `pickupPoint` is not
-sent.
+The label's `carrierReference` keeps what tracking and cancellation need and the tracking id
+does not give: the `shipmentId`, the `carrierId` of the rate bought (`AMZN_UK`, `AMZN_FR`,
+`AMZN_INTL` across borders, `USPS`...) and the tracking id, as
+`shipmentId=...&carrierId=...&trackingId=...`. Keep it with the order and pass it to `track()` and
+`cancel()`. A purchase without either id is a `CarrierException` (`Amazon Shipping purchased no
+shipment.`). `pickupPoint` is not sent.
 
-> [!WARNING]
-> Known defect: `cancel()` needs the `shipmentId`, which the `Label` does not keep when a tracking id comes back, where `cancel($label->trackingNumber)` should cancel what `ship()` booked.
-
-**Track.** `GET /tracking` with the number and the carrier id `AMZN_UK`, whatever the region or
-the business; the locale is not sent. Each event of `eventHistory`: its `eventTime`, its
+**Track.** `GET /tracking` with the tracking id and the carrier id: given the label's
+`carrierReference`, the carrier of the rate bought; given a bare tracking id, the `carrier_id`
+option (`AMZN_UK` by default, Amazon's default business being `AmazonShipping_UK`). The locale is
+not sent; the tracking's `trackingNumber` is the tracking id. Each event of `eventHistory`: its `eventTime`, its
 `eventCode` as both description and `code` (Amazon's event has no text here), `city countryCode`
 as location; sorted oldest first. The status is the summary's `status`, else the latest event's
 code:
-
-> [!WARNING]
-> Known defect: the carrier id is always `AMZN_UK`, whatever the region, where it should follow the configured region.
 
 | Amazon code | `TrackingStatus` |
 |---|---|
@@ -124,9 +124,9 @@ code:
 | another code | `IN_TRANSIT` |
 | none | `UNKNOWN` |
 
-**Cancel.** `PUT /shipments/{id}/cancel` with the number given as the shipment id: `true` when it
-does not fail. Amazon cancels by shipment id, while `ship()` returns the package's tracking id as
-`trackingNumber` (see "Verified, and not"): pass the `shipmentId` Amazon returned.
+**Cancel.** `PUT /shipments/{shipmentId}/cancel` with the shipment id of the label's
+`carrierReference`; a bare value is taken as the shipment id itself (Amazon finds no shipment by
+its tracking id): `true` when it does not fail.
 
 ## Example
 
@@ -166,8 +166,10 @@ $label = $amazon->ship($shipment);   // no service: the cheapest rate is purchas
 file_put_contents($label->trackingNumber.'.pdf', (string) $label->content);
 echo $label->trackingNumber, ' ', $label->trackingUrl, "\n";
 
-$tracking = $amazon->track($label->trackingNumber);
+$tracking = $amazon->track($label->carrierReference);   // the carrier of the rate bought
 echo $tracking->status->value, ' ', $tracking->latest()?->location, "\n";
+
+var_dump($amazon->cancel($label->carrierReference));    // by its shipment id
 ```
 
 In Symfony:
@@ -207,16 +209,18 @@ any call.
 Tested offline: `Tests/AmazonGatewayTest.php` (rates cheapest first with their delivery window,
 the sandbox host, the access token and business id headers, kilograms; the chosen rate purchased
 with its request token and its label, the cheapest one without a service; tracking with its
-statuses and location; the cancellation by shipment id) and `Tests/AmazonContractTest.php`, the
+statuses and location; the label's `carrierReference` tracking with the carrier of the rate bought
+and cancelling by the shipment id; a bare tracking number tracked with `carrier_id`; the
+cancellation by shipment id) and `Tests/AmazonContractTest.php`, the
 family's conformance suite on recorded answers. The example above was run in the core's harness on
 those recorded answers.
 
 Not verified: the README says the package is built from Amazon's published SP-API documentation
-and was not yet run against the sandbox; that needs the credentials above. Three points are
-unchecked against Amazon: tracking always asks with the carrier id `AMZN_UK`; the ship date carries
-a `Z` without being converted to UTC; and `cancel()` takes a shipment id while `ship()` hands back
-the tracking id, so cancelling with `$label->trackingNumber` sends the wrong id when Amazon
-returned a tracking id.
+and was not yet run against the sandbox; that needs the credentials above. Unchecked against
+Amazon: the ship date carries a `Z` without being converted to UTC; tracking and cancelling through
+the label's `carrierReference` follow the Shipping API v2 model (getTracking's `carrierId` "returned
+by the getRates operation for the selected rate", cancelShipment's `shipmentId` "returned by the
+purchaseShipment operation"), not yet a real purchase.
 
 ## Responsibility
 

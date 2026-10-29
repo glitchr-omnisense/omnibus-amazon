@@ -15,6 +15,8 @@ use Omnibus\Request\Shipping;
 /**
  * getRates then purchaseShipment: the rate matching the service (a serviceId;
  * none: the cheapest) bought with a label (PDF 4x6; ZPL with option label_format).
+ * The label's carrierReference keeps the shipment id and the rate's carrier id,
+ * which tracking and cancellation need.
  */
 final class ShippingAction implements ActionInterface, ApiAwareInterface
 {
@@ -66,6 +68,8 @@ final class ShippingAction implements ActionInterface, ApiAwareInterface
         }
         $document = $data['packageDocumentDetails'][0]['packageDocuments'][0] ?? [];
         $content = isset($document['contents']) ? base64_decode((string) $document['contents']) : null;
-        $request->setResult(new Label('amazon', $number, $content, $zpl ? Label::ZPL : Label::PDF, null, 'https://track.amazon.com/tracking/'.rawurlencode($number)));
+        $shipmentId = (string) ($data['shipmentId'] ?? '');
+        $reference = '' !== $shipmentId ? Mapping::reference($shipmentId, (string) ($chosen['carrierId'] ?? $this->api->carrierId), $number) : null;
+        $request->setResult(new Label('amazon', $number, $content, $zpl ? Label::ZPL : Label::PDF, null, 'https://track.amazon.com/tracking/'.rawurlencode($number), $reference));
     }
 }

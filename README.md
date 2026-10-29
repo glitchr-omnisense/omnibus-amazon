@@ -22,6 +22,7 @@ omnibus:
                 refresh_token: '%env(AMAZON_REFRESH_TOKEN)%'
                 region: eu                               # eu, na, fe
                 business_id: AmazonShipping_UK           # the shipping business
+                carrier_id: AMZN_UK                      # the carrier a bare tracking number is tracked with
                 sandbox: true
                 rates: [...]                             # optional: configured prices instead of getRates
 ```

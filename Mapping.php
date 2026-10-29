@@ -10,6 +10,26 @@ use Omnibus\Model\TrackingStatus;
 /** Shipping v2's shapes for ours. */
 final class Mapping
 {
+    /**
+     * The label's carrierReference: what getTracking (the rate's carrierId, the trackingId) and
+     * cancelShipment (the shipmentId) need, which the tracking id alone does not give.
+     */
+    public static function reference(string $shipmentId, string $carrierId, string $trackingId): string
+    {
+        return http_build_query(['shipmentId' => $shipmentId, 'carrierId' => $carrierId, 'trackingId' => $trackingId]);
+    }
+
+    /** @return array{shipmentId?: string, carrierId?: string, trackingId?: string} a carrierReference read, or [] for a bare number */
+    public static function parseReference(string $value): array
+    {
+        if (!str_starts_with($value, 'shipmentId=')) {
+            return [];
+        }
+        parse_str($value, $parts);
+
+        return array_filter(array_intersect_key(array_map('strval', array_filter($parts, 'is_string')), ['shipmentId' => 1, 'carrierId' => 1, 'trackingId' => 1]), static fn (string $v) => '' !== $v);
+    }
+
     public static function address(Address $a): array
     {
         return array_filter([

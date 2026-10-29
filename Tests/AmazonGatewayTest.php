@@ -21,7 +21,7 @@ final class AmazonGatewayTest extends TestCase
         return new Shipment(new Address('Glitch Art', ['1 Rue du Test'], '67000', 'Strasbourg', 'FR'), new Address('Alex Martin', ['10 Downing Street'], 'SW1A 2AA', 'London', 'GB', email: 'alex@example.org'), [new Parcel(850, 30, 20, 10, 2500, 'GBP')], $service, reference: 'ORDER-1042');
     }
 
-    private function gateway(): \Omnibus\GatewayInterface
+    private function gateway(array $options = []): \Omnibus\GatewayInterface
     {
         $http = new MockHttpClient(function (string $method, string $url, array $options): MockResponse {
             $path = (string) parse_url($url, \PHP_URL_PATH);
@@ -30,8 +30,8 @@ final class AmazonGatewayTest extends TestCase
             return match (true) {
                 str_contains($url, 'api.amazon.com/auth') => new MockResponse(json_encode(['access_token' => 'Atza|tok', 'expires_in' => 3600])),
                 '/shipping/v2/shipments/rates' === $path => new MockResponse(json_encode(['payload' => ['requestToken' => 'rt-1', 'rates' => [
-                    ['rateId' => 'r-std', 'serviceId' => 'std-uk', 'serviceName' => 'Amazon Shipping Standard', 'totalCharge' => ['value' => 4.2, 'unit' => 'GBP'], 'promise' => ['deliveryWindow' => ['start' => '2026-10-03T08:00:00Z', 'end' => '2026-10-05T20:00:00Z']]],
-                    ['rateId' => 'r-exp', 'serviceId' => 'exp-uk', 'serviceName' => 'Amazon Shipping Express', 'totalCharge' => ['value' => 7.9, 'unit' => 'GBP']],
+                    ['rateId' => 'r-std', 'carrierId' => 'AMZN_UK', 'carrierName' => 'Amazon Shipping', 'serviceId' => 'std-uk', 'serviceName' => 'Amazon Shipping Standard', 'totalCharge' => ['value' => 4.2, 'unit' => 'GBP'], 'promise' => ['deliveryWindow' => ['start' => '2026-10-03T08:00:00Z', 'end' => '2026-10-05T20:00:00Z']]],
+                    ['rateId' => 'r-exp', 'carrierId' => 'AMZN_INTL', 'carrierName' => 'Amazon Shipping', 'serviceId' => 'exp-uk', 'serviceName' => 'Amazon Shipping Express', 'totalCharge' => ['value' => 7.9, 'unit' => 'GBP']],
                 ]]])),
                 '/shipping/v2/shipments' === $path => new MockResponse(json_encode(['payload' => ['shipmentId' => 'sh-1', 'packageDocumentDetails' => [['trackingId' => 'TBA123456789000', 'packageDocuments' => [['type' => 'LABEL', 'format' => 'PDF', 'contents' => base64_encode('%PDF-1.4 amz')]]]]]])),
                 '/shipping/v2/tracking' === $path => new MockResponse(json_encode(['payload' => ['trackingId' => 'TBA123456789000', 'summary' => ['status' => 'DELIVERED'], 'eventHistory' => [['eventCode' => 'DELIVERED', 'eventTime' => '2026-10-02T11:30:00Z', 'location' => ['city' => 'London', 'countryCode' => 'GB']], ['eventCode' => 'IN_TRANSIT', 'eventTime' => '2026-10-01T17:00:00Z', 'location' => ['city' => 'Coventry', 'countryCode' => 'GB']]]]])),
@@ -40,7 +40,7 @@ final class AmazonGatewayTest extends TestCase
             };
         });
 
-        return (new AmazonGatewayFactory($http))->create(['client_id' => 'amzn1.application-oa2-client.x', 'client_secret' => 'secret', 'refresh_token' => 'Atzr|refresh', 'region' => 'eu', 'business_id' => 'AmazonShipping_UK', 'sandbox' => true]);
+        return (new AmazonGatewayFactory($http))->create(['client_id' => 'amzn1.application-oa2-client.x', 'client_secret' => 'secret', 'refresh_token' => 'Atzr|refresh', 'region' => 'eu', 'business_id' => 'AmazonShipping_UK', 'sandbox' => true] + $options);
     }
 
     public function testRatesComeCheapestFirstWithTheDeliveryWindow(): void
@@ -81,5 +81,40 @@ final class AmazonGatewayTest extends TestCase
         self::assertSame('London GB', $tracking->latest()->location);
         self::assertTrue($gateway->cancel('sh-1'));
         self::assertSame('PUT', end($this->calls)[0]);
+    }
+
+    /**
+     * Shipping API v2 (selling-partner-api-models, shippingV2.json): getTracking takes "a carrier
+     * identifier originally returned by the getRates operation for the selected rate" with the
+     * tracking id, and cancelShipment "the shipment identifier originally returned by the
+     * purchaseShipment operation". The label keeps both in its carrierReference, which track()
+     * and cancel() take in place of the tracking number.
+     */
+    public function testTheLabelsCarrierReferenceTracksAndCancelsTheShipmentBought(): void
+    {
+        $gateway = $this->gateway();
+        $label = $gateway->ship(self::shipment('exp-uk'));
+        self::assertSame('TBA123456789000', $label->trackingNumber);
+        self::assertNotNull($label->carrierReference);
+
+        $this->calls = [];
+        $tracking = $gateway->track($label->carrierReference);
+        self::assertSame('TBA123456789000', $tracking->trackingNumber);
+        $query = [];
+        parse_str((string) parse_url($this->calls[0][1], \PHP_URL_QUERY), $query);
+        self::assertSame(['trackingId' => 'TBA123456789000', 'carrierId' => 'AMZN_INTL'], $query, 'the carrier of the rate bought');
+
+        self::assertTrue($gateway->cancel($label->carrierReference));
+        self::assertSame('PUT', end($this->calls)[0]);
+        self::assertStringEndsWith('/shipping/v2/shipments/sh-1/cancel', (string) parse_url(end($this->calls)[1], \PHP_URL_PATH));
+    }
+
+    /** A bare tracking number is tracked with the configured carrier_id (AMZN_UK by default, Amazon's default business being AmazonShipping_UK). */
+    public function testABareTrackingNumberUsesTheConfiguredCarrier(): void
+    {
+        $this->gateway(['carrier_id' => 'AMZN_FR'])->track('TBA123456789000');
+        $query = [];
+        parse_str((string) parse_url(end($this->calls)[1], \PHP_URL_QUERY), $query);
+        self::assertSame('AMZN_FR', $query['carrierId']);
     }
 }

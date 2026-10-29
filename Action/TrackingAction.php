@@ -12,7 +12,10 @@ use Omnibus\Model\TrackingEvent;
 use Omnibus\Request\Request;
 use Omnibus\Request\Tracking;
 
-/** GET /shipping/v2/tracking: the package's event history, oldest first. */
+/**
+ * GET /shipping/v2/tracking: the package's event history, oldest first. Given a label's
+ * carrierReference, the carrier of the rate bought; given a bare tracking id, the carrier_id option.
+ */
 final class TrackingAction implements ActionInterface, ApiAwareInterface
 {
     /** @use ApiAwareTrait<Api> */
@@ -31,12 +34,14 @@ final class TrackingAction implements ActionInterface, ApiAwareInterface
     public function execute(Request $request): void
     {
         \assert($request instanceof Tracking);
-        $data = $this->api->call('GET', '/shipping/v2/tracking', null, ['trackingId' => $request->trackingNumber, 'carrierId' => 'AMZN_UK']);
+        $reference = Mapping::parseReference($request->trackingNumber);
+        $trackingId = $reference['trackingId'] ?? $request->trackingNumber;
+        $data = $this->api->call('GET', '/shipping/v2/tracking', null, ['trackingId' => $trackingId, 'carrierId' => $reference['carrierId'] ?? $this->api->carrierId]);
         $events = [];
         foreach ($data['eventHistory'] ?? [] as $event) {
             $events[] = new TrackingEvent(new \DateTimeImmutable((string) ($event['eventTime'] ?? 'now')), Mapping::status($event['eventCode'] ?? null), (string) ($event['eventCode'] ?? ''), trim(implode(' ', array_filter([$event['location']['city'] ?? null, $event['location']['countryCode'] ?? null]))) ?: null, $event['eventCode'] ?? null);
         }
         usort($events, static fn (TrackingEvent $a, TrackingEvent $b) => $a->at <=> $b->at);
-        $request->setResult(new TrackingModel('amazon', $request->trackingNumber, Mapping::status($data['summary']['status'] ?? ($events ? $events[array_key_last($events)]->code : null)), $events));
+        $request->setResult(new TrackingModel('amazon', $trackingId, Mapping::status($data['summary']['status'] ?? ($events ? $events[array_key_last($events)]->code : null)), $events));
     }
 }

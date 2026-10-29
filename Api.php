@@ -28,6 +28,8 @@ final class Api
         public readonly ?string $businessId = null,
         public readonly bool $sandbox = false,
         private readonly int $timeout = 20,
+        /** The carrier a bare tracking number is tracked with (a label's carrierReference names its own) */
+        public readonly string $carrierId = 'AMZN_UK',
     ) {
     }
 
