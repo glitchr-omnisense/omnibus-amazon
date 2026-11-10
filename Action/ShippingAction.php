@@ -61,7 +61,7 @@ final class ShippingAction implements ActionInterface, ApiAwareInterface
             'requestToken' => $quote['requestToken'] ?? '',
             'rateId' => $chosen['rateId'],
             'requestedDocumentSpecification' => ['format' => $zpl ? 'ZPL' : 'PDF', 'size' => ['width' => 4, 'length' => 6, 'unit' => 'INCH'], 'dpi' => 300, 'pageLayout' => 'DEFAULT', 'needFileJoining' => false, 'requestedDocumentTypes' => ['LABEL']],
-        ]);
+        ], [], self::idempotency($s->option('idempotency_key')));
         $number = (string) ($data['packageDocumentDetails'][0]['trackingId'] ?? $data['shipmentId'] ?? '');
         if ('' === $number) {
             throw new CarrierException('amazon', 'Amazon Shipping purchased no shipment.');
@@ -71,5 +71,17 @@ final class ShippingAction implements ActionInterface, ApiAwareInterface
         $shipmentId = (string) ($data['shipmentId'] ?? '');
         $reference = '' !== $shipmentId ? Mapping::reference($shipmentId, (string) ($chosen['carrierId'] ?? $this->api->carrierId), $number) : null;
         $request->setResult(new Label('amazon', $number, $content, $zpl ? Label::ZPL : Label::PDF, null, 'https://track.amazon.com/tracking/'.rawurlencode($number), $reference));
+    }
+
+    /**
+     * The purchase's x-amzn-IdempotencyKey: the shipment's "idempotency_key" option, one per
+     * attempt kept by the caller, so that a purchase made again after a failure buys one label.
+     * None without it: no key is safe to invent (a random one changes on every attempt).
+     *
+     * @return array<string, string>
+     */
+    private static function idempotency(mixed $key): array
+    {
+        return \is_string($key) && '' !== $key ? ['x-amzn-IdempotencyKey' => $key] : [];
     }
 }

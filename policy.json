@@ -1,0 +1,53 @@
+{
+    "$schema": "https://github.com/glitchr-omnisense/contracts/blob/1.x/resources/usage-policy.schema.json",
+    "provider": "amazon",
+    "rateLimits": [
+        {
+            "max": 80,
+            "window": "second",
+            "scope": "key",
+            "operations": [],
+            "cost": {
+                "ship": 2
+            },
+            "note": "Shipping API v2 usage plan: 80 requests a second, burst 100, per selling partner and application pair. A shipment is rated then purchased: 2."
+        }
+    ],
+    "concurrency": null,
+    "rights": {
+        "commercial": "contract",
+        "openSourceRequired": false,
+        "caching": {
+            "permission": "contract",
+            "maxTtl": null
+        },
+        "storage": "contract",
+        "redistribution": "forbidden",
+        "attribution": {
+            "required": false,
+            "text": null,
+            "url": null,
+            "where": []
+        },
+        "licence": null,
+        "retention": {
+            "maxAge": 2592000,
+            "covers": "Personally identifiable information: at most 30 days after the order's delivery unless the law requires longer (Data Protection Policy 2.1); deleted within 30 days of Amazon's request"
+        }
+    },
+    "requirements": {
+        "key": true,
+        "userAgent": {
+            "required": false,
+            "pattern": null
+        }
+    },
+    "provenance": {
+        "terms": "https://sellercentral.amazon.com/mws/static/policy?documentType=AUP&locale=en_US",
+        "policy": "https://github.com/amzn/selling-partner-api-models/blob/main/models/shipping-api-model/shippingV2.json",
+        "verifiedAt": "2026-11-10",
+        "declaredBy": "maintainer",
+        "contact": "https://developer-docs.amazon.com/sp-api/",
+        "notes": "Usage plans from the official Shipping v2 model (the 5/15 figures quoted elsewhere are Shipping v1's). Acceptable Use Policy: respect each user's throttling, never work around it with several accounts or applications; no aggregation of data across users' businesses (4.4), no disclosure beyond the authorised activity; PII only for merchant-fulfilled shipping. Data Protection Policy: PII encrypted at rest, TLS 1.2+. purchaseShipment takes x-amzn-IdempotencyKey: the package sends the shipment's \"idempotency_key\" option. cancelShipment takes none."
+    }
+}

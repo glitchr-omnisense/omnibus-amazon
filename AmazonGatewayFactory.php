@@ -30,6 +30,7 @@ final class AmazonGatewayFactory extends GatewayFactory
         $config->defaults([
             'omnibus.factory_name' => 'amazon',
             'omnibus.factory_title' => 'Amazon Shipping',
+            'omnibus.policy' => __DIR__.'/policy.json',
             'omnibus.required_options' => ['client_id', 'client_secret', 'refresh_token'],
             'region' => 'eu',
             'business_id' => null,
@@ -38,7 +39,7 @@ final class AmazonGatewayFactory extends GatewayFactory
             'omnibus.api' => function (Config $c) {
                 $http = $this->http ?? HttpClient::create();
 
-                return new Api($http, (string) $c['client_id'], (string) $c['client_secret'], (string) $c['refresh_token'], (string) $c['region'], $c['business_id'] ?: null, (bool) $c['sandbox'], carrierId: (string) ($c['carrier_id'] ?: 'AMZN_UK'));
+                return new Api($http, (string) $c['client_id'], (string) $c['client_secret'], (string) $c['refresh_token'], (string) $c['region'], $c['business_id'] ?: null, (bool) $c['sandbox'], carrierId: (string) ($c['carrier_id'] ?: 'AMZN_UK'), backoff: $c->backoff());
             },
             'omnibus.action.rating' => static fn (Config $c) => $c->get('rates') ? null : new RatingAction(),
             'omnibus.action.shipping' => new ShippingAction(),

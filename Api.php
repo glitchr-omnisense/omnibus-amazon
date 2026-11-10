@@ -4,6 +4,8 @@ namespace Omnibus\Amazon;
 
 use Omnibus\Exception\CarrierException;
 use Omnibus\Http\Redaction;
+use Omnibus\Http\Throttle;
+use Omnisense\Contracts\Policy\Backoff;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface as HttpExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -31,6 +33,8 @@ final class Api
         private readonly int $timeout = 20,
         /** The carrier a bare tracking number is tracked with (a label's carrierReference names its own) */
         public readonly string $carrierId = 'AMZN_UK',
+        /** The waits the carrier asks for (omnisense/contracts' Backoff): no call while one lasts, a 429 a RateLimitedException, never retried */
+        private readonly ?Backoff $backoff = null,
     ) {
     }
 
@@ -41,17 +45,23 @@ final class Api
         return $this->sandbox ? str_replace('sellingpartnerapi-', 'sandbox.sellingpartnerapi-', $base) : $base;
     }
 
-    /** @return array<string, mixed> the payload */
-    public function call(string $method, string $path, ?array $body = null, array $query = []): array
+    /**
+     * @param array<string, string> $headers more headers (x-amzn-IdempotencyKey on a purchase)
+     *
+     * @return array<string, mixed> the payload
+     */
+    public function call(string $method, string $path, ?array $body = null, array $query = [], array $headers = []): array
     {
         try {
+            Throttle::before($this->backoff);
             $response = $this->http->request($method, $this->base().$path, [
-                'headers' => array_filter(['x-amz-access-token' => $this->token(), 'x-amzn-shipping-business-id' => $this->businessId, 'Content-Type' => 'application/json', 'Accept' => 'application/json']),
+                'headers' => array_filter(['x-amz-access-token' => $this->token(), 'x-amzn-shipping-business-id' => $this->businessId, 'Content-Type' => 'application/json', 'Accept' => 'application/json'] + $headers),
                 'query' => $query,
                 'body' => null === $body ? null : json_encode($body, \JSON_THROW_ON_ERROR),
                 'timeout' => $this->timeout,
             ]);
             $status = $response->getStatusCode();
+            Throttle::after($this->backoff, 'amazon', $status, $response->getHeaders(false));
             $data = json_decode($response->getContent(false), true);
         } catch (HttpExceptionInterface|\JsonException $e) {
             $secrets = $this->secrets();
@@ -75,6 +85,7 @@ final class Api
             return $this->token;
         }
         try {
+            Throttle::before($this->backoff);
             $data = $this->http->request('POST', self::LWA, ['body' => ['grant_type' => 'refresh_token', 'refresh_token' => $this->refreshToken, 'client_id' => $this->clientId, 'client_secret' => $this->clientSecret], 'timeout' => $this->timeout])->toArray(false);
         } catch (HttpExceptionInterface $e) {
             $secrets = $this->secrets();

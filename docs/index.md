@@ -185,6 +185,10 @@ omnibus:
                 sandbox: '%env(bool:AMAZON_SANDBOX)%'
 ```
 
+## Usage policy
+
+`policy.json` (named in `composer.json`'s `extra.omnisense.policy`) declares the Shipping API v2 usage plan, 80 requests a second (burst 100) per selling partner and application (a shipment counts 2: rated, then purchased). Personal data is kept 30 days after delivery at most (`rights.retention`, Data Protection Policy), never aggregated across users. A purchase carries `x-amzn-IdempotencyKey` when the shipment has an `idempotency_key` option: keep one per attempt, and a purchase made again after a failure buys one label. Cancellations take no key. A 429 is a `RateLimitedException`, never retried, and the carrier's next calls wait for its `Retry-After`, unsent. See omnisense/omnibus' [Usage policies and rate limits](https://github.com/glitchr-omnisense/omnibus/blob/2.x/docs/policies.md).
+
 ## Errors
 
 Every failure is an `Omnibus\Exception\CarrierException` whose `carrier` is `amazon`:
