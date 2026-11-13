@@ -4,6 +4,43 @@ Amazon Shipping for [omnisense/omnibus](https://github.com/glitchr-omnisense/omn
 purchased shipments with their labels, tracking and cancellation - the Selling Partner API's
 Shipping v2, with Login with Amazon.
 
+## Install and a first call
+
+```sh
+composer require omnibus/amazon
+```
+
+No account for this first call: Amazon Shipping's answer is recorded
+(`Omnibus\Testing\RecordedHttpClient` answers in place of the API), so nothing leaves the process.
+With your own credentials, give the factory your HTTP client (or none: it makes its own) and drop
+the recorded one.
+
+```php
+<?php
+
+require __DIR__.'/vendor/autoload.php';
+
+use Omnibus\Amazon\AmazonGatewayFactory;
+use Omnibus\Testing\RecordedHttpClient;
+
+// Amazon Shipping's answer, recorded: no account, and nothing leaves the process.
+$http = new RecordedHttpClient([
+    'api.amazon.com/auth' => ['access_token' => 'Atza|tok', 'expires_in' => 3600],
+    '/shipping/v2/tracking' => ['payload' => ['trackingId' => 'TBA123456789000', 'summary' => ['status' => 'DELIVERED'], 'eventHistory' => [
+        ['eventCode' => 'DELIVERED', 'eventTime' => '2026-10-02T11:30:00Z', 'location' => ['city' => 'London', 'countryCode' => 'GB']],
+    ]]],
+]);
+$gateway = (new AmazonGatewayFactory($http))->create(['client_id' => 'amzn1.application-oa2-client.x', 'client_secret' => 'secret', 'refresh_token' => 'Atzr|refresh', 'region' => 'eu', 'business_id' => 'AmazonShipping_UK', 'sandbox' => true]);
+
+$tracking = $gateway->track('TBA123456789000');
+echo $tracking->status->value, ' - ', $tracking->latest()?->description, "\n";   // delivered - DELIVERED
+```
+
+A real call needs a Amazon Shipping account (the credentials below). The answer is shaped after
+Amazon Shipping's published documentation; the package has not been run against its service yet.
+
+## Configuration
+
 ```php
 $gateway = (new AmazonGatewayFactory($http))->create($options);   // $http: the application's HTTP client - none given, the factory makes its own; the options below
 ```
